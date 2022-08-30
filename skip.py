@@ -26,17 +26,11 @@
 
 
 import argparse
-from genericpath import isfile
-from random import sample
-import re
 import os
 import json
-import glob
 import shutil
-import time
 import ffpb
 import subprocess
-from typing import List
 import numpy as np
 from scipy.io import wavfile
 from fractions import Fraction
@@ -44,10 +38,10 @@ from colorama import Fore, Style
 from logging import error, warning
 from pathlib import Path
 from tqdm import tqdm
-from math import ceil, floor
+from math import ceil
 from audiotsm import phasevocoder
 from audiotsm.io.wav import WavReader, WavWriter
-from shutil import copyfile, rmtree
+from shutil import copyfile
 
 def createTemp(dirname='./TEMP'):
     try:
@@ -326,7 +320,7 @@ def process_video(filename:str, silent_threshold=0.03, frame_margin=1, frame_qua
     print(f'{Fore.GREEN}{Style.NORMAL}All done!{Fore.WHITE}{Style.RESET_ALL}')
 
 if __name__ == '__main__':
-    print(chr(27) + "[2J")
+    print(chr(27) + "[2J") # Clean screen
     print(f'{Fore.WHITE}{Style.BRIGHT}skip{Fore.GREEN}py{Fore.WHITE}\nhttps://www.github.com/Joan-GQ/skip{Fore.GREEN}py{Fore.WHITE}{Style.RESET_ALL}\n\n')
     
     parser = argparse.ArgumentParser()
