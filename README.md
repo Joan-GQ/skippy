@@ -1,5 +1,5 @@
 <div align='center'>
-  <img src="assets/skippy.png">
+  <img src="./assets/skippy.png">
 </div>
 
 
