@@ -17,6 +17,7 @@ It's based off of [carykh's jumpcutter](https://www.github.com/carykh/jumpcutter
 
 - A working FFMPEG installation added to `PATH`.
 
+- As for the OS, it's been only tested on Windows 10 64 bit. It might work on other operating systems.
 
 
 # Usage
@@ -60,3 +61,25 @@ Skippy'd = 3.113 minutes. 62.3% of total duration. Reduced by 1.884 minutes.
 The green and red bar is an approximated visualization of the video. It indicates which portions of the video have been marked as 'silent' (In red) or 'loud' (In green). The `Skippy'd` time, is the new estimated time after deleting the silent portions.
 
 *Note that if the silent speed is not that fast, the actual time will be noticeably different that the estimate.*
+
+# Batch process
+
+Batch processing videos is currently **not** supported.
+If on Windows, it's possible to achieve this by:
+```powershell
+Get-ChildItem ".\folder\*.mp4" | foreach { python '.\skip' --input_file $_.FullName }
+```
+
+Then, to merge all the videos, a little Python script can be used, too:
+
+```python
+files = list(filter(os.path.isfile, glob.glob(os.path.join(os.getcwd(), '*.mp4'))))
+files.sort(key=lambda x: os.path.getctime(x))
+
+with open('files.txt', 'w') as output:
+    for file in files:
+        output.write("file '" + file + "'\n")
+
+os.system('ffmpeg -f concat -safe 0 -i files.txt merged.mp4')
+os.remove('files.txt')
+```
