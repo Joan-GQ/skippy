@@ -57,6 +57,6 @@ Input time = 4.997 minutes
 Skippy'd = 3.113 minutes. 62.3% of total duration. Reduced by 1.884 minutes.
 ```
 
-The green and red bar is an approximated version of the video. It indicates which portions of the video have been marked as 'silent' (In red) or 'loud' (In green). The `Skippy'd` time, is the new estimated time after deleting the silent portions.
+The green and red bar is an approximated visualization of the video. It indicates which portions of the video have been marked as 'silent' (In red) or 'loud' (In green). The `Skippy'd` time, is the new estimated time after deleting the silent portions.
 
 *Note that if the silent speed is not that fast, the actual time will be noticeably different that the estimate.*
