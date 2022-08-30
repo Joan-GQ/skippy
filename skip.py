@@ -31,7 +31,9 @@ import re
 import os
 import json
 import glob
+import shutil
 import time
+import ffpb
 import subprocess
 from typing import List
 import numpy as np
@@ -42,6 +44,9 @@ from logging import error, warning
 from pathlib import Path
 from tqdm import tqdm
 from math import ceil, floor
+from audiotsm import phasevocoder
+from audiotsm.io.wav import WavReader, WavWriter
+from shutil import copyfile, rmtree
 
 def createTemp(dirname='./TEMP'):
     try:
@@ -135,11 +140,41 @@ def printGraphics(total_length:int, sequence:list):
             print(f'{Fore.RED}',end='')
         print('█',end='')
 
-def process_video(filename:str, silent_threshold=0.03, frame_margin=1, frame_quality=3):
+def inputToOutputFilename(filename:str) -> str:
+    dotIndex = filename.rfind(".")
+    return filename[:dotIndex]+"_ALTERED"+filename[dotIndex:]
+
+def copyFrame(inputFrame,outputFrame, temp_folder='./TEMP'):
+    src = temp_folder+"/frame{:06d}".format(inputFrame+1)+".jpg"
+    dst = temp_folder+"/newFrame{:06d}".format(outputFrame+1)+".jpg"
+    if not os.path.isfile(src):
+        return False
+    copyfile(src, dst)
+    if outputFrame%20 == 19:
+        pass
+        #print(str(outputFrame+1)+" time-altered frames saved.")
+    return True
+
+def extractFrames(input_file:str, frame_quality:int, temp_folder='./TEMP'):
+    print(f'{Style.BRIGHT} Extracting frames...')
+    command = "-i "+input_file+" -qscale:v "+str(frame_quality)+" "+temp_folder+"/frame%06d.jpg -hide_banner"
+    rvalue = ffpb.main(argv=command, tqdm=tqdm)
+    if rvalue == 0:
+        print(f'{Fore.GREEN}Successfully processed frames.{Fore.RESET}')
+
+def process_video(filename:str, silent_threshold=0.03, frame_margin=1, frame_quality=3, silent_speed=5.00, sounded_speed=1.0, output_file=''):
+    INPUT_FILE = filename
+    NEW_SPEED = [silent_speed, sounded_speed]
+    AUDIO_FADE_ENVELOPE_SIZE = 400
     TEMP_FOLDER = createTemp('./TEMP')
     info = getWAVinfo(filename)
     FRAME_RATE = getFPS(info)
     SAMPLE_RATE = getSR(info)
+    OUTPUT_FILE = output_file
+    FRAME_QUALITY = frame_quality
+    
+    if len(output_file) <= 1:
+        OUTPUT_FILE = inputToOutputFilename(INPUT_FILE)
 
     audio_file = extractAudio(filename, SAMPLE_RATE, temp_folder=TEMP_FOLDER, output_file='audio.wav')
 
@@ -200,78 +235,81 @@ def process_video(filename:str, silent_threshold=0.03, frame_margin=1, frame_qua
     print(f'{Style.RESET_ALL}{Fore.RESET}Proceed? [Y/N]', end=' ')
     choice = input()
 
-    if choice == 'n' or choice == 'N':
-        try:
-            os.remove(str(audio_file.absolute()))
-            os.removedirs('./TEMP')
-        except OSError:
-            pass
+    if choice == 'y' or choice == 'Y':
+        print()
+        extractFrames(INPUT_FILE, FRAME_QUALITY)
 
-    elif choice == 'y' or choice == 'Y':
-        # TODO: extractFrames() ffmpeg -i "+INPUT_FILE+" -qscale:v "+str(FRAME_QUALITY)+" "+TEMP_FOLDER+"/frame%06d.jpg -hide_banner
-        
         # TODO: ⮦ This code ⮧
 
-        # chunks = [[0,0,0]]
-        # shouldIncludeFrame = np.zeros((audioFrameCount))
-        # for i in range(audioFrameCount):
-        #     if (i >= 1 and shouldIncludeFrame[i] != shouldIncludeFrame[i-1]): # Did we flip?
-        #         chunks.append([chunks[-1][1],i,shouldIncludeFrame[i-1]])
+        chunks = [[0,0,0]]
 
-        # chunks.append([chunks[-1][1],audioFrameCount,shouldIncludeFrame[i-1]])
-        # chunks = chunks[1:]
+        cbar = tqdm(range(audioFrameCount), unit=' chunk', unit_divisor=1000, unit_scale=True)
+        cbar.set_description_str('Processing chunks')
+        cbar.colour = 'cyan'
 
-        # outputAudioData = np.zeros((0,audioData.shape[1]))
-        # outputPointer = 0
+        for i in cbar:
+            if (i >= 1 and shouldIncludeFrame[i] != shouldIncludeFrame[i-1]): # Did we flip?
+                chunks.append([chunks[-1][1],i,shouldIncludeFrame[i-1]])
 
-        # lastExistingFrame = None
-        # for chunk in chunks:
-        #     audioChunk = audioData[int(chunk[0]*samplesPerFrame):int(chunk[1]*samplesPerFrame)]
+        chunks.append([chunks[-1][1],audioFrameCount,shouldIncludeFrame[i-1]])
+        chunks = chunks[1:]
+
+        outputAudioData = np.zeros((0,audioData.shape[1]))
+        outputPointer = 0
+
+        lastExistingFrame = None
+
+        cbar = tqdm(chunks, unit=' chunk', unit_divisor=1000, unit_scale=True)
+        cbar.set_description_str('Time warping')
+        cbar.colour = 'cyan'
+
+        for chunk in cbar:
+            audioChunk = audioData[int(chunk[0]*samplesPerFrame):int(chunk[1]*samplesPerFrame)]
             
-        #     sFile = TEMP_FOLDER+"/tempStart.wav"
-        #     eFile = TEMP_FOLDER+"/tempEnd.wav"
-        #     wavfile.write(sFile,SAMPLE_RATE,audioChunk)
-        #     with WavReader(sFile) as reader:
-        #         with WavWriter(eFile, reader.channels, reader.samplerate) as writer:
-        #             tsm = phasevocoder(reader.channels, speed=NEW_SPEED[int(chunk[2])])
-        #             tsm.run(reader, writer)
-        #     _, alteredAudioData = wavfile.read(eFile)
-        #     leng = alteredAudioData.shape[0]
-        #     endPointer = outputPointer+leng
-        #     outputAudioData = np.concatenate((outputAudioData,alteredAudioData/maxAudioVolume))
+            sFile = TEMP_FOLDER+"/tempStart.wav"
+            eFile = TEMP_FOLDER+"/tempEnd.wav"
+            wavfile.write(sFile,SAMPLE_RATE,audioChunk)
+            with WavReader(sFile) as reader:
+                with WavWriter(eFile, reader.channels, reader.samplerate) as writer:
+                    tsm = phasevocoder(reader.channels, speed=NEW_SPEED[int(chunk[2])])
+                    tsm.run(reader, writer)
+            _, alteredAudioData = wavfile.read(eFile)
+            leng = alteredAudioData.shape[0]
+            endPointer = outputPointer+leng
+            outputAudioData = np.concatenate((outputAudioData,alteredAudioData/maxAudioVolume))
 
-        #     #outputAudioData[outputPointer:endPointer] = alteredAudioData/maxAudioVolume
-
-        #     # smooth out transitiion's audio by quickly fading in/out
+            # smooth out transitiion's audio by quickly fading in/out
             
-        #     if leng < AUDIO_FADE_ENVELOPE_SIZE:
-        #         outputAudioData[outputPointer:endPointer] = 0 # audio is less than 0.01 sec, let's just remove it.
-        #     else:
-        #         premask = np.arange(AUDIO_FADE_ENVELOPE_SIZE)/AUDIO_FADE_ENVELOPE_SIZE
-        #         mask = np.repeat(premask[:, np.newaxis],2,axis=1) # make the fade-envelope mask stereo
-        #         outputAudioData[outputPointer:outputPointer+AUDIO_FADE_ENVELOPE_SIZE] *= mask
-        #         outputAudioData[endPointer-AUDIO_FADE_ENVELOPE_SIZE:endPointer] *= 1-mask
+            if leng < AUDIO_FADE_ENVELOPE_SIZE:
+                outputAudioData[outputPointer:endPointer] = 0 # audio is less than 0.01 sec, let's just remove it.
+            else:
+                premask = np.arange(AUDIO_FADE_ENVELOPE_SIZE)/AUDIO_FADE_ENVELOPE_SIZE
+                mask = np.repeat(premask[:, np.newaxis],2,axis=1) # make the fade-envelope mask stereo
+                outputAudioData[outputPointer:outputPointer+AUDIO_FADE_ENVELOPE_SIZE] *= mask
+                outputAudioData[endPointer-AUDIO_FADE_ENVELOPE_SIZE:endPointer] *= 1-mask
 
-        #     startOutputFrame = int(math.ceil(outputPointer/samplesPerFrame))
-        #     endOutputFrame = int(math.ceil(endPointer/samplesPerFrame))
-        #     for outputFrame in range(startOutputFrame, endOutputFrame):
-        #         inputFrame = int(chunk[0]+NEW_SPEED[int(chunk[2])]*(outputFrame-startOutputFrame))
-        #         didItWork = copyFrame(inputFrame,outputFrame)
-        #         if didItWork:
-        #             lastExistingFrame = inputFrame
-        #         else:
-        #             copyFrame(lastExistingFrame,outputFrame)
+            startOutputFrame = int(ceil(outputPointer/samplesPerFrame))
+            endOutputFrame = int(ceil(endPointer/samplesPerFrame))
 
-        #     outputPointer = endPointer
+            for outputFrame in range(startOutputFrame, endOutputFrame):
+                inputFrame = int(chunk[0]+NEW_SPEED[int(chunk[2])]*(outputFrame-startOutputFrame))
+                didItWork = copyFrame(inputFrame,outputFrame)
+                if didItWork:
+                    lastExistingFrame = inputFrame
+                else:
+                    copyFrame(lastExistingFrame,outputFrame)
 
-        # wavfile.write(TEMP_FOLDER+"/audioNew.wav",SAMPLE_RATE,outputAudioData)
+            outputPointer = endPointer
 
-        # command = "ffmpeg -framerate "+str(frameRate)+" -i "+TEMP_FOLDER+"/newFrame%06d.jpg -i "+TEMP_FOLDER+"/audioNew.wav -strict -2 "+OUTPUT_FILE
-        # subprocess.call(command, shell=True)
+        wavfile.write(TEMP_FOLDER+"/audioNew.wav",SAMPLE_RATE,outputAudioData)
+
+        print(f'{Fore.CYAN}{Style.BRIGHT}Saving...{Fore.RESET}{Style.RESET_ALL}')
+        command = "-framerate "+str(FRAME_RATE)+" -i "+TEMP_FOLDER+"/newFrame%06d.jpg -i "+TEMP_FOLDER+"/audioNew.wav -strict -2 "+OUTPUT_FILE
+        ffpb.main(argv=command, tqdm=tqdm)
         pass
 
 
-    print(choice, end=' \n')
+    shutil.rmtree(TEMP_FOLDER)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
