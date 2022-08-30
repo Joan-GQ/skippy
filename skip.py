@@ -27,6 +27,7 @@
 
 import argparse
 from genericpath import isfile
+from random import sample
 import re
 import os
 import json
@@ -156,11 +157,11 @@ def copyFrame(inputFrame,outputFrame, temp_folder='./TEMP'):
     return True
 
 def extractFrames(input_file:str, frame_quality:int, temp_folder='./TEMP'):
-    print(f'{Style.BRIGHT} Extracting frames...')
+    print(f'{Style.BRIGHT}Extracting frames...')
     command = "-i "+input_file+" -qscale:v "+str(frame_quality)+" "+temp_folder+"/frame%06d.jpg -hide_banner"
     rvalue = ffpb.main(argv=command, tqdm=tqdm)
     if rvalue == 0:
-        print(f'{Fore.GREEN}Successfully processed frames.{Fore.RESET}')
+        print(f'{Fore.GREEN}Successfully extracted frames.{Fore.RESET}')
 
 def process_video(filename:str, silent_threshold=0.03, frame_margin=1, frame_quality=3, silent_speed=5.00, sounded_speed=1.0, output_file=''):
     INPUT_FILE = filename
@@ -181,9 +182,19 @@ def process_video(filename:str, silent_threshold=0.03, frame_margin=1, frame_qua
     sampleRate, audioData = wavfile.read(str(audio_file))
 
     if sampleRate != SAMPLE_RATE:
-        warning(f'{Fore.YELLOW}Provided sample rate ({SAMPLE_RATE}) doesn\'t match with read sample rate ({sampleRate}). Using the read one.{Fore.WHITE}')
-    else:
-        del sampleRate
+        warning(f'{Fore.YELLOW}Sample rates doesnt match ({SAMPLE_RATE} != {sampleRate}). Using {SAMPLE_RATE}.{Fore.WHITE}')
+    
+    del sampleRate
+
+    print(f'{Style.BRIGHT}Input file: {INPUT_FILE}\n' \
+            f'Silent threshold: {silent_threshold}\n' \
+            f'Frame margin: {frame_margin}\n' \
+            f'Frame quality: {FRAME_QUALITY}\n' \
+            f'Sounded speed: x{sounded_speed}\n' \
+            f'Silent speed: x{silent_speed}\n' \
+            f'Output file: {OUTPUT_FILE}\n' \
+            f'Detected framerate: {FRAME_RATE} FPS\n' \
+            f'Detected samplerate: {SAMPLE_RATE} Hz\n')
 
     audioSampleCount = audioData.shape[0]
     maxAudioVolume = getMaxVolume(audioData)
@@ -235,9 +246,11 @@ def process_video(filename:str, silent_threshold=0.03, frame_margin=1, frame_qua
     print(f'{Style.RESET_ALL}{Fore.RESET}Proceed? [Y/N]', end=' ')
     choice = input()
 
+    # TODO: Handle response better, this is too sketchy.
     if choice == 'y' or choice == 'Y':
         print()
         extractFrames(INPUT_FILE, FRAME_QUALITY)
+        print()
 
         # TODO: ⮦ This code ⮧
 
@@ -303,20 +316,28 @@ def process_video(filename:str, silent_threshold=0.03, frame_margin=1, frame_qua
 
         wavfile.write(TEMP_FOLDER+"/audioNew.wav",SAMPLE_RATE,outputAudioData)
 
-        print(f'{Fore.CYAN}{Style.BRIGHT}Saving...{Fore.RESET}{Style.RESET_ALL}')
+        print(f'{Fore.CYAN}{Style.BRIGHT}\nSaving...{Fore.RESET}{Style.RESET_ALL}')
         command = "-framerate "+str(FRAME_RATE)+" -i "+TEMP_FOLDER+"/newFrame%06d.jpg -i "+TEMP_FOLDER+"/audioNew.wav -strict -2 "+OUTPUT_FILE
         ffpb.main(argv=command, tqdm=tqdm)
         pass
 
-
+    print(f'\n{Fore.WHITE}{Style.DIM}Tidying up...{Fore.WHITE}{Style.RESET_ALL}')
     shutil.rmtree(TEMP_FOLDER)
+    print(f'{Fore.GREEN}{Style.NORMAL}All done!{Fore.WHITE}{Style.RESET_ALL}')
 
 if __name__ == '__main__':
+    print(chr(27) + "[2J")
+    print(f'{Fore.WHITE}{Style.BRIGHT}skip{Fore.GREEN}py{Fore.WHITE}\nhttps://www.github.com/Joan-GQ/skip{Fore.GREEN}py{Fore.WHITE}{Style.RESET_ALL}\n\n')
+    
     parser = argparse.ArgumentParser()
     parser.add_argument('--input_file', type=str,  help='Input file to be modified.')
     parser.add_argument('--silent_threshold', type=float, default=0.12, help="An index between 0 and 1. A value of 0 will keep everything; a value of 1 will only retain the silence. Default = 0.12")
     parser.add_argument('--frame_margin', type=float, default=1, help="A frame margin for smoothing out the transitions. Default = 1")
     parser.add_argument('--frame_quality', type=int, default=3, help="Quality of the frame output by FFMPEG. Default = 3")
+    parser.add_argument('--url', type=str, help='A youtube url to download and process')
+    parser.add_argument('--output_file', type=str, default="", help="the output file. (optional. if not included, it'll just modify the input file name)")
+    parser.add_argument('--sounded_speed', type=float, default=1.00, help="the speed that sounded (spoken) frames should be played at. Typically 1.")
+    parser.add_argument('--silent_speed', type=float, default=5.00, help="the speed that silent frames should be played at. 999999 for jumpcutting.")
 
     args = parser.parse_args()
 
@@ -325,4 +346,7 @@ if __name__ == '__main__':
     process_video(filename=args.input_file,
                   silent_threshold=args.silent_threshold,
                   frame_margin=args.frame_margin,
-                  frame_quality=args.frame_quality)
+                  frame_quality=args.frame_quality,
+                  sounded_speed=args.sounded_speed,
+                  silent_speed=args.silent_speed,
+                  output_file=args.output_file)
