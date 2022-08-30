@@ -67,7 +67,7 @@ The green and red bar is an approximated visualization of the video. It indicate
 Batch processing videos is currently **not** supported.
 If on Windows, it's possible to achieve this by:
 ```powershell
-Get-ChildItem ".\folder\*.mp4" | foreach { python '.\skip' --input_file $_.FullName --force true }
+Get-ChildItem ".\folder\*.mp4" | foreach { python '.\skip.py' --input_file $_.FullName --force true }
 ```
 
 Then, to merge all the videos, a little Python script can be used, too. (**See [merge.py](./merge.py)**)
