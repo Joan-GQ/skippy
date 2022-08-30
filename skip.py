@@ -157,7 +157,7 @@ def extractFrames(input_file:str, frame_quality:int, temp_folder='./TEMP'):
     if rvalue == 0:
         print(f'{Fore.GREEN}Successfully extracted frames.{Fore.RESET}')
 
-def process_video(filename:str, silent_threshold=0.03, frame_margin=1, frame_quality=3, silent_speed=5.00, sounded_speed=1.0, output_file=''):
+def process_video(filename:str, silent_threshold=0.03, frame_margin=1, frame_quality=3, silent_speed=5.00, sounded_speed=1.0, output_file='',force=False):
     INPUT_FILE = filename
     NEW_SPEED = [silent_speed, sounded_speed]
     AUDIO_FADE_ENVELOPE_SIZE = 400
@@ -236,9 +236,11 @@ def process_video(filename:str, silent_threshold=0.03, frame_margin=1, frame_qua
     # TODO: Make printGraphics() use compressed chunks
     printGraphics(100, shouldIncludeFrame)
 
-    print('\n')
-    print(f'{Style.RESET_ALL}{Fore.RESET}Proceed? [Y/N]', end=' ')
-    choice = input()
+    choice = 'y'
+    if not force:
+        print('\n')
+        print(f'{Style.RESET_ALL}{Fore.RESET}Proceed? [Y/N]', end=' ')
+        choice = input()
 
     # TODO: Handle response better, this is too sketchy.
     if choice == 'y' or choice == 'Y':
@@ -328,10 +330,10 @@ if __name__ == '__main__':
     parser.add_argument('--silent_threshold', type=float, default=0.12, help="An index between 0 and 1. A value of 0 will keep everything; a value of 1 will only retain the silence. Default = 0.12")
     parser.add_argument('--frame_margin', type=float, default=1, help="A frame margin for smoothing out the transitions. Default = 1")
     parser.add_argument('--frame_quality', type=int, default=3, help="Quality of the frame output by FFMPEG. Default = 3")
-    parser.add_argument('--url', type=str, help='A youtube url to download and process')
-    parser.add_argument('--output_file', type=str, default="", help="the output file. (optional. if not included, it'll just modify the input file name)")
-    parser.add_argument('--sounded_speed', type=float, default=1.00, help="the speed that sounded (spoken) frames should be played at. Typically 1.")
-    parser.add_argument('--silent_speed', type=float, default=5.00, help="the speed that silent frames should be played at. 999999 for jumpcutting.")
+    parser.add_argument('--output_file', type=str, default="", help="The output file. By default it outputs to [input]_ALTERED.mp4")
+    parser.add_argument('--sounded_speed', type=float, default=1.00, help="The speed that sounded (spoken) frames should be played at. Typically 1.")
+    parser.add_argument('--silent_speed', type=float, default=5.00, help="The speed that silent frames should be played at. 999999 for jumpcutting.")
+    parser.add_argument('--force', type=bool, default=False, help='[true|false] If true, then doesn\'t ask for confirmation on the first time.')
 
     args = parser.parse_args()
 
@@ -343,4 +345,5 @@ if __name__ == '__main__':
                   frame_quality=args.frame_quality,
                   sounded_speed=args.sounded_speed,
                   silent_speed=args.silent_speed,
-                  output_file=args.output_file)
+                  output_file=args.output_file,
+                  force=args.force)
