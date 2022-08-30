@@ -10,5 +10,4 @@
 
 <div align='center'>
   <img src="assets/skippy-test.png">
-  <h5>Video editing Python script</h5>
 </div>
