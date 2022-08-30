@@ -12,10 +12,10 @@ It's based off of [carykh's jumpcutter](https://www.github.com/carykh/jumpcutter
 
 # Requirements
 
-- A working Python installation.
+- A working [Python](https://www.python.org/) installation.
   You may need to install aditional libraries. (See `skip.py` for the imports).
 
-- A working FFMPEG installation added to `PATH`.
+- A working [`ffmpeg`](https://ffmpeg.org/) installation added to `PATH`.
 
 - As for the OS, it's been only tested on Windows 10 64 bit. It might work on other operating systems.
 
